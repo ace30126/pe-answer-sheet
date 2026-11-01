@@ -76,15 +76,21 @@
   .it.sel .vis .ah { fill: #2f6fd6; }
   .hd { fill: #fff; stroke: #2f6fd6; stroke-width: 2; pointer-events: all; cursor: crosshair; }
   .labels { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
-  .lbl { position: absolute; pointer-events: auto; white-space: pre; font-family: var(--hand); font-size: calc(var(--fs) * .8); line-height: 45px; color: var(--ink); padding: 0 3px; min-width: 12px; cursor: move; outline: none; }
-  .lbl[data-a="c"] { transform: translateX(-50%); }
+  .lbl, .lbl-sp { position: absolute; pointer-events: auto; white-space: pre; font-family: var(--hand); font-size: calc(var(--fs) * .8); line-height: 45px; color: var(--ink); padding: 0 3px; min-width: 12px; cursor: move; outline: none; }
+  .lbl[data-a="c"], .lbl-sp[data-a="c"] { transform: translateX(-50%); }
   .lbl[contenteditable="true"] { cursor: text; outline: 1.5px dashed #2f6fd6; background: rgba(255,255,255,.7); }
-  .lbl.sel { outline: 2px dashed #2f6fd6; }
-  .lbl[data-ph] { color: #a7b0bc; }
+  .lbl.sel, .lbl-sp.sel { outline: 2px dashed #2f6fd6; }
+  .lbl[data-ph], .lbl-sp[data-ph] { color: #a7b0bc; }
   .tgrid { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
   .tcell { position: absolute; pointer-events: auto; cursor: cell; }
   .tcell:hover { background: rgba(47,111,214,.06); }
   .tcell.on { background: rgba(47,111,214,.16); }
+  /* 쪽 아래로 넘친 표·개념도: 원래 쪽에서는 잘리고, 다음 쪽 첫 줄부터 이어서 비춰 보인다 */
+  .draw, .labels, .tgrid { clip-path: polygon(-80px -60px, calc(100% + 80px) -60px, calc(100% + 80px) 100%, -80px 100%); }
+  .spill-d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; overflow: hidden; }
+  .spill-l { position: absolute; inset: 0; z-index: 4; overflow: hidden; }
+  .spill-d, .spill-d *, .spill-l, .spill-l * { pointer-events: none !important; }
+  .spill-d .sel .vis { stroke: #2f6fd6; }
   .marq { position: absolute; z-index: 8; border: 1.5px dashed #2f6fd6; background: rgba(47,111,214,.08); pointer-events: none; }
   body:not([data-tool="text"]) .sheet { cursor: crosshair; }
   body[data-tool="move"] .sheet { cursor: default; }
@@ -130,6 +136,14 @@
   #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); padding: 10px 18px; border-radius: 8px; background: #24314d; color: #fff; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 200; }
   #toast.show { opacity: 1; }
 
+  body.shot .obj-bar, body.shot .rz, body.shot .obj-lines, body.shot .ln, body.shot .hdl, body.shot .tgrid,
+  body.shot .lbl[data-ph], body.shot .lbl-sp[data-ph] { display: none !important; }
+  body.shot .page { box-shadow: none; margin: 0; }
+  body.shot .row:focus-within { background: none; }
+  body.shot .draw, body.shot .labels { overflow: hidden; }
+  body.shot .rules .hl { background: none; border-top: 1px dotted var(--rule); }
+  body.shot .rules .vl { background: none; border-left: 1px dotted var(--rule); }
+
   @media print {
     @page { size: A4; margin: 0; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -139,9 +153,9 @@
     #stage { padding: 0; }
     #pages { zoom: 1 !important; }
     .page { margin: 0; box-shadow: none; break-after: page; }
-    .obj-bar, .rz, .obj-lines, .ln, .hdl, .lbl[data-ph] { display: none !important; }
-    .obj.sel, .lbl.sel { outline: none; }
-    .it.sel .vis { stroke: var(--ink); }
+    .obj-bar, .rz, .obj-lines, .ln, .hdl, .lbl[data-ph], .lbl-sp[data-ph] { display: none !important; }
+    .obj.sel, .lbl.sel, .lbl-sp.sel { outline: none; }
+    .it.sel .vis, .spill-d .sel .vis { stroke: var(--ink); }
     .it.sel .vis .ah { fill: var(--ink); }
     .row:focus-within { background: none; }
   }
@@ -201,8 +215,8 @@
     <button id="tmReset" title="타이머 초기화">↺</button>
   </div>
   <div class="grp">
-    <button id="btnSample" title="예시 답안 불러오기">예시</button>
-    <button id="btnSave" title="답안을 JSON 파일로 저장">저장</button>
+    <button id="btnShot" title="답안지를 사진(PNG)으로 저장">사진 저장</button>
+    <button id="btnSave" title="이어 쓸 수 있게 답안 파일(JSON)로 저장. [불러오기]로 다시 엽니다">파일 저장</button>
     <button id="btnLoad" title="저장한 JSON 파일 열기">불러오기</button>
     <input type="file" id="fileJson" accept=".json,application/json" hidden>
     <button id="btnPrint" title="인쇄 또는 PDF로 저장 (A4)">인쇄·PDF</button>
@@ -753,28 +767,47 @@
     fitPage();
     renderHandles(); updateAllMasks(); changed();
   }
-  // 표·개념도가 쪽 아래(위)로 넘치면 통째로 다음 쪽 첫 줄(앞 쪽 끝 줄)로 옮긴다
+  // 표·개념도는 첫 줄이 있는 쪽에 속하고, 아래로 넘친 줄은 다음 쪽 첫 줄부터 이어진다(renderSpill).
+  // 첫 줄이 쪽을 벗어나면 그 쪽으로 옮긴다. 쪽 사이를 이어 붙인 좌표라 한 줄씩 자연스럽게 넘어간다
   function fitPage(dragging) {
     const els = [...sel];
-    if (!els.some(onRows)) return;
+    if (!els.some(onRows)) return false;
     const sheet = els[0].closest('.sheet'), bbs = els.filter(x => x.classList.contains('it')).map(bboxOf);
-    if (!bbs.length) return;
+    if (!bbs.length) return false;
     const top = Math.min(...bbs.map(b => b[1])), bot = Math.max(...bbs.map(b => b[3])), H = ROWS * LH;
-    if (bot - top > H) return;
     const pages = $$('.page'), i = pages.indexOf(sheet.closest('.page'));
-    let to = sheet, dy = 0;
-    if (bot > H) { to = $('.sheet', pages[i + 1] || makePage()); dy = -top; }
-    else if (top < 0) {
-      if (i > 0) { to = $('.sheet', pages[i - 1]); dy = H - bot; }
-      else dy = -top;
-    }
-    if (!dy && to === sheet) return;
+    const k = Math.max(-i, Math.floor(top / H));
+    let dy = -k * H;
+    if (top + dy < 0) dy -= top + dy;
+    while (pages.length <= i + k + (bot + dy > H ? 1 : 0)) pages.push(makePage());
+    const to = $('.sheet', pages[i + k]);
+    if (!dy && to === sheet) return false;
     els.forEach(el => {
       if (el.classList.contains('lbl')) { el.style.top = parseFloat(el.style.top) + dy + 'px'; if (to !== sheet) $('.labels', to).appendChild(el); }
       else { const d = itemData(el); setPts(el, { y1: d.y1 + dy, y2: d.y2 + dy }); if (to !== sheet) $('.items', to).appendChild(el); }
     });
     if (to !== sheet && !dragging) to.closest('.page').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return to !== sheet;
+  }
+  function renderSpill() {
+    const H = ROWS * LH, pages = $$('.page');
+    $$('.spill-d, .spill-l').forEach(x => x.remove());
+    pages.forEach((p, i) => {
+      const next = pages[i + 1], sh = $('.sheet', p);
+      if (!next) return;
+      const its = $$('.it', sh).filter(x => bboxOf(x)[3] > H), ls = $$('.lbl', sh).filter(x => parseFloat(x.style.top) + x.offsetHeight > H);
+      if (!its.length && !ls.length) return;
+      const nsh = $('.sheet', next);
+      const svg = document.createElementNS(NS, 'svg'), g = document.createElementNS(NS, 'g');
+      svg.setAttribute('class', 'spill-d');
+      g.setAttribute('transform', `translate(0 ${-H})`);
+      its.forEach(x => { const c = x.cloneNode(true); c.setAttribute('class', x.classList.contains('sel') ? 'sel' : ''); g.appendChild(c); });
+      svg.appendChild(g);
+      const box = document.createElement('div');
+      box.className = 'spill-l';
+      ls.forEach(x => { const c = x.cloneNode(true); c.className = 'lbl-sp' + (x.classList.contains('sel') ? ' sel' : ''); c.removeAttribute('contenteditable'); c.style.top = parseFloat(x.style.top) - H + 'px'; box.appendChild(c); });
+      nsh.append(svg, box);
+    });
   }
 
   // 되돌리기 (그리기·그림만)
@@ -1362,7 +1395,7 @@
         act.p0 = sheetPt(act.sheet, e);
         act.orig = origOf();
       }
-      renderHandles();
+      renderHandles(); renderSpill();
     } else if (act.type === 'marquee') {
       const L = Math.min(p.x, act.p0.x), T = Math.min(p.y, act.p0.y);
       Object.assign(act.box.style, { left: L + 'px', top: T + 'px', width: Math.abs(p.x - act.p0.x) + 'px', height: Math.abs(p.y - act.p0.y) + 'px' });
@@ -1679,13 +1712,13 @@
       updateMask(sh);
     });
     if (!$('.page')) makePage();
-    renderHandles();
+    renderHandles(); renderSpill();
     stats();
   }
   function blank(n = 3) { load({ opt: { ...opt }, pages: Array.from({ length: n }, () => ({})) }); }
 
   let saveT = null;
-  function changed() { clearTimeout(saveT); saveT = setTimeout(save, 600); }
+  function changed() { renderSpill(); clearTimeout(saveT); saveT = setTimeout(save, 600); }
   function save() {
     stats();
     try {
@@ -1724,10 +1757,54 @@
   };
   $('#btnPrint').onclick = () => { clearSel(); selectObj(null); window.print(); };
   $('#btnNew').onclick = () => { if (confirm('지금 답안을 모두 지우고 새로 시작할까요?')) { blank(3); changed(); } };
-  $('#btnSample').onclick = () => {
-    const used = rows().some(r => !isEmptyRow(r)) || $('.it, .lbl, .obj');
-    if (used && !confirm('지금 답안을 지우고 예시 답안을 불러올까요?')) return;
-    load(sampleData()); changed();
+  // 사진 저장: 내용이 있는 쪽까지 그려서 세로로 이어 붙인 PNG 한 장. 인쇄처럼 선택 표시·회색 안내 글자는 뺀다
+  const loadShot = () => window.html2canvas ? Promise.resolve() : new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  const pageUsed = p => $$('.row', p).some(r => !isEmptyRow(r)) || $$('.it, .lbl:not([data-ph]), .obj, .spill-d', p).length > 0;
+  $('#btnShot').onclick = async () => {
+    toast('사진을 만드는 중입니다…');
+    try { await loadShot(); } catch (err) { toast('사진 도구를 불러오지 못했습니다. 인터넷 연결을 확인하세요'); return; }
+    blurActive(); clearSel(); selectObj(null); renderSpill();
+    const pages = $$('.page');
+    let n = 1;
+    pages.forEach((p, i) => { if (pageUsed(p)) n = i + 1; });
+    const z = pagesEl.style.zoom;
+    pagesEl.style.zoom = 1;
+    const cs = [];
+    try {
+      for (const p of pages.slice(0, n)) {
+        cs.push(await html2canvas(p, {
+          scale: 2, backgroundColor: '#fffefb', logging: false,
+          onclone: doc => {
+            doc.body.classList.add('shot');
+            // 그림은 SVG를 따로 그리므로 스타일시트 색·굵기를 속성으로 박아 둔다
+            doc.querySelectorAll('.draw *, .spill-d *').forEach(el => {
+              const c = doc.defaultView.getComputedStyle(el);
+              el.setAttribute('style', `fill:${c.fill};stroke:${c.stroke};stroke-width:${c.strokeWidth};stroke-dasharray:${c.strokeDasharray}`);
+            });
+          },
+        }));
+      }
+    } finally { pagesEl.style.zoom = z; }
+    const gap = 40, out = document.createElement('canvas');
+    out.width = cs[0].width;
+    out.height = cs.reduce((s, c) => s + c.height, 0) + gap * (cs.length - 1);
+    const cx = out.getContext('2d');
+    cx.fillStyle = '#d8d4cc'; cx.fillRect(0, 0, out.width, out.height);
+    let y = 0;
+    cs.forEach(c => { cx.drawImage(c, 0, y); y += c.height + gap; });
+    out.toBlob(blob => {
+      const a = document.createElement('a'), d = new Date(), p = k => String(k).padStart(2, '0');
+      a.href = URL.createObjectURL(blob);
+      a.download = `답안지_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast(`${n}쪽을 사진으로 저장했습니다`);
+    }, 'image/png');
   };
 
   let toastT = null;
