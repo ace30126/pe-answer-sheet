@@ -18,7 +18,26 @@
   .grp { display: flex; align-items: center; gap: 4px; padding-right: 10px; border-right: 1px solid #e0dbd2; }
   .grp:last-child { border-right: none; }
   .grp > label { color: #7a7f8a; margin-right: 2px; }
-  .br { flex-basis: 100%; height: 0; }
+  /* 리본: 윗줄 = 제목·탭·타이머, 아랫줄 = 고른 탭의 버튼 묶음만 */
+  #tabs { display: flex; gap: 2px; }
+  #tb #tabs button { border: none; background: none; border-radius: 6px 6px 0 0; padding: 0 12px; font-weight: 700; color: #6d727b; }
+  #tb #tabs button:hover { background: #f1eee8; color: #24314d; }
+  #tb #tabs button.on { background: none; color: #24314d; box-shadow: inset 0 -3px 0 #24314d; }
+  #tmGrp { margin-left: auto; padding-right: 0; border-right: none; }
+  #tbBody { flex-basis: 100%; display: flex; align-items: center; gap: 6px 10px; padding-top: 7px; border-top: 1px solid #ece8e0; overflow-x: auto; scrollbar-width: thin; }
+  #tbBody .grp { flex: none; }
+  #tbBody .grp:not(.tab-on) { display: none; }
+  #helpBtn { border: 1px solid #d6d1c7; background: #fff; border-radius: 10px; padding: 1px 9px; font: inherit; color: #6d727b; cursor: pointer; }
+  #helpBtn.on { background: #24314d; border-color: #24314d; color: #fff; }
+  #info .help { display: none; flex-basis: 100%; }
+  body.show-help #info .help { display: block; }
+  @media (max-width: 760px) {
+    #tb { padding: 6px 10px; gap: 4px 6px; }
+    .brand, #tmSel, #tb #tmReset { display: none; }
+    #tb #tabs button { padding: 0 8px; }
+    .tm { min-width: 84px; }
+    #info { padding: 5px 10px; gap: 4px 10px; font-size: 11px; }
+  }
   #tb button, #tb select { font: inherit; height: 30px; border: 1px solid #cfc9be; background: #fff; border-radius: 6px; color: #2a2f3a; }
   #tb button { padding: 0 9px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
   #tb button:hover { background: #f1eee8; }
@@ -165,7 +184,19 @@
 
 <header id="tb">
   <div class="brand">기술사 답안지</div>
-  <div class="grp">
+  <nav id="tabs"><button data-t="font" class="on">글씨</button><button data-t="edit">편집</button><button data-t="draw">그리기</button><button data-t="table">표·개념도</button><button data-t="file">파일</button></nav>
+  <div class="grp" id="tmGrp">
+    <select id="tmSel" title="타이머 시간">
+      <option value="100">1교시 전체 100분</option>
+      <option value="10">1교시 1문제 10분</option>
+      <option value="25">2~4교시 1문제 25분</option>
+      <option value="5">시연 5분</option>
+    </select>
+    <button id="tmBtn" class="tm">▶ 100:00</button>
+    <button id="tmReset" title="타이머 초기화">↺</button>
+  </div>
+  <div id="tbBody">
+  <div class="grp" data-tab="font">
     <label>글씨</label>
     <select id="fontSel" title="글꼴">
       <option value="gaegu">손글씨 (개구)</option>
@@ -188,33 +219,23 @@
       <option value="blue">파랑</option>
     </select>
   </div>
-  <div class="grp">
+  <div class="grp" data-tab="font">
     <button id="btnEmph" title="선택한 글자를 강조 (밑줄 + 따옴표)"><u>"강조"</u></button>
     <button id="btnClear" title="선택한 글자의 밑줄 지우기">서식 지우기</button>
     <button id="btnEnd" title="현재 줄 끝에 &quot;끝&quot; 쓰기">"끝"</button>
     <button id="btnBlank" title="다음 빈 줄에 이하 여백 쓰기">이하 여백</button>
   </div>
-  <div class="grp">
+  <div class="grp" data-tab="edit">
     <button id="btnInsLine" title="현재 줄 위에 빈 줄 (Ctrl+Enter)">줄 삽입</button>
     <button id="btnDelLine" title="현재 줄 지우고 당기기 (Ctrl+Shift+Backspace)">줄 삭제</button>
     <button id="btnAddPage">쪽 추가</button>
     <button id="btnDelPage" title="마지막 쪽 삭제">쪽 삭제</button>
     <button id="btnLn" title="오른쪽 여백에 줄 번호 표시">줄번호</button>
   </div>
-  <div class="grp">
+  <div class="grp" data-tab="edit">
     <button id="zOut" title="축소">-</button><span id="zoomVal">100%</span><button id="zIn" title="확대">+</button>
   </div>
-  <div class="grp">
-    <select id="tmSel" title="타이머 시간">
-      <option value="100">1교시 전체 100분</option>
-      <option value="10">1교시 1문제 10분</option>
-      <option value="25">2~4교시 1문제 25분</option>
-      <option value="5">시연 5분</option>
-    </select>
-    <button id="tmBtn" class="tm">▶ 100:00</button>
-    <button id="tmReset" title="타이머 초기화">↺</button>
-  </div>
-  <div class="grp">
+  <div class="grp" data-tab="file">
     <button id="btnShot" title="답안지를 사진(PNG)으로 저장">사진 저장</button>
     <button id="btnSave" title="이어 쓸 수 있게 답안 파일(JSON)로 저장. [불러오기]로 다시 엽니다">파일 저장</button>
     <button id="btnLoad" title="저장한 JSON 파일 열기">불러오기</button>
@@ -222,8 +243,7 @@
     <button id="btnPrint" title="인쇄 또는 PDF로 저장 (A4)">인쇄·PDF</button>
     <button id="btnNew" class="danger">새 답안</button>
   </div>
-  <div class="br"></div>
-  <div class="grp" id="tools">
+  <div class="grp" id="tools" data-tab="draw">
     <label>그리기</label>
     <button data-tool="text" class="on" title="글쓰기 (Esc). Shift+드래그하면 직선">글쓰기</button>
     <button data-tool="move" title="이동: 그림·글자를 눌러 끌기, 빈 곳을 끌면 여러 개 선택"><svg viewBox="0 0 20 20"><path d="M7.5 10.5V4.2a1.4 1.4 0 0 1 2.8 0V9.5M10.3 9V3.2a1.4 1.4 0 0 1 2.8 0V9.5M13.1 9.5V5.2a1.4 1.4 0 0 1 2.8 0v6.3a6 6 0 0 1-6 6H9a5 5 0 0 1-4-2l-2.6-3.6a1.3 1.3 0 0 1 2-1.7l3.1 2.8"/></svg></button>
@@ -240,7 +260,7 @@
     <button id="btnImg" title="그림 파일 넣기 (Ctrl+V 붙여넣기, 끌어다 놓기도 가능)">그림파일</button>
     <input type="file" id="fileImg" accept="image/*" multiple hidden>
   </div>
-  <div class="grp">
+  <div class="grp" data-tab="table">
     <label>표</label>
     <button data-tpl="t3" title="구분 | 항목 | 설명 (7줄)">3단표</button>
     <button data-tpl="cmp" title="구분 | 토픽A | 토픽B (5줄)">비교표</button>
@@ -250,11 +270,11 @@
     <button id="tMerge" title="고른 칸들 병합 (Shift+클릭으로 범위 선택)">병합</button>
     <button id="tSplit" title="고른 칸들의 병합 풀기">병합 풀기</button>
   </div>
-  <div class="grp">
+  <div class="grp" data-tab="table">
     <label>개념도</label>
     <button id="btnCd" title="개념도 미리보기 패널 열기·닫기 (커서 다음 줄부터 넣음)">유형 고르기</button>
   </div>
-  <div class="grp" id="selGrp">
+  <div class="grp" id="selGrp" data-tab="draw table">
     <label>선택</label>
     <button id="sDash" title="실선/점선 바꾸기">점선</button>
     <button id="sGroup" title="선택한 것들을 한 묶음으로">묶기</button>
@@ -263,12 +283,14 @@
     <button id="sDel" title="삭제 (Delete)">삭제</button>
     <button id="sUndo" title="그리기 되돌리기 (Ctrl+Z)">되돌리기</button>
   </div>
+  </div>
 </header>
 <aside id="cdPanel"><div class="cdh">개념도 유형<button id="cdClose" title="닫기">×</button></div><div id="cdList"></div></aside>
 <div id="info">
   <span id="stat"></span>
   <span id="saveState"></span>
-  <span class="note">비공식 실습 도구(Q-Net 공식 아님) · PC 브라우저 전용 · 답안은 이 브라우저에만 저장되니 다른 PC로 옮기거나 보관하려면 [저장]으로 파일을 받아 두세요</span>
+  <span class="note">비공식 실습 도구(Q-Net 공식 아님) · PC 권장 · 답안은 이 브라우저에만 저장됩니다. 보관·이동은 [파일 저장]으로</span>
+  <button id="helpBtn" title="단축키·사용 요령 보기">단축키</button>
   <span class="help">"1. " "가. " "- " 를 치면 번호 칸으로 자동 정렬 · Shift+드래그 직선 · 도형 더블클릭=도형 안에 글자 · Ctrl+드래그 여러 개 선택 · 그림 선택 후 Delete/화살표/Ctrl+D · Ctrl+V 그림 붙여넣기</span>
 </div>
 <main id="stage"><div id="pages"></div></main>
@@ -1532,6 +1554,15 @@
   $('#btnCd').onclick = () => toggleCd(!document.body.classList.contains('cd-open'));
   $('#cdClose').onclick = () => toggleCd(false);
   window.addEventListener('resize', () => { $('#cdPanel').style.top = $('#tb').offsetHeight + 'px'; });
+  // 도구 막대는 리본처럼 고른 탭의 묶음만 보인다
+  function setTab(t) {
+    $$('#tabs [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    $$('#tbBody .grp').forEach(g => g.classList.toggle('tab-on', (g.dataset.tab || '').split(' ').includes(t)));
+    $('#cdPanel').style.top = $('#tb').offsetHeight + 'px';
+  }
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) setTab(b.dataset.t); });
+  setTab('font');
+  $('#helpBtn').onclick = () => $('#helpBtn').classList.toggle('on', document.body.classList.toggle('show-help'));
   // 패널을 눌러도 답안지 커서(넣을 위치)를 잃지 않게
   $('#cdPanel').addEventListener('mousedown', e => e.preventDefault());
   $('#cdList').addEventListener('click', e => {
