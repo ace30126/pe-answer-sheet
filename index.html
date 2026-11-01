@@ -740,8 +740,9 @@
     });
     clearSel(); made.forEach(addSel); renderHandles(); updateAllMasks(); changed();
   }
+  const origOf = () => new Map([...sel].map(x => [x, x.classList.contains('lbl') ? { l: parseFloat(x.style.left), t: parseFloat(x.style.top) } : itemData(x)]));
   function nudge(dx, dy) {
-    if ([...sel].some(x => x.dataset.tb)) dx = 0;
+    if ([...sel].some(onRows)) dx = 0;
     if ([...sel].some(onRows)) dy = Math.sign(dy) * LH;
     if (!dx && !dy) return;
     pushUndo();
@@ -753,7 +754,7 @@
     renderHandles(); updateAllMasks(); changed();
   }
   // 표·개념도가 쪽 아래(위)로 넘치면 통째로 다음 쪽 첫 줄(앞 쪽 끝 줄)로 옮긴다
-  function fitPage() {
+  function fitPage(dragging) {
     const els = [...sel];
     if (!els.some(onRows)) return;
     const sheet = els[0].closest('.sheet'), bbs = els.filter(x => x.classList.contains('it')).map(bboxOf);
@@ -772,7 +773,8 @@
       if (el.classList.contains('lbl')) { el.style.top = parseFloat(el.style.top) + dy + 'px'; if (to !== sheet) $('.labels', to).appendChild(el); }
       else { const d = itemData(el); setPts(el, { y1: d.y1 + dy, y2: d.y2 + dy }); if (to !== sheet) $('.items', to).appendChild(el); }
     });
-    if (to !== sheet) to.closest('.page').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (to !== sheet && !dragging) to.closest('.page').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return to !== sheet;
   }
 
   // 되돌리기 (그리기·그림만)
@@ -1270,11 +1272,11 @@
       e.preventDefault(); blurActive();
       if (e.ctrlKey || e.metaKey) { if (sel.has(el)) { el.classList.remove('sel'); sel.delete(el); renderHandles(); } else selectGroup(el, true); }
       else if (!sel.has(el)) selectGroup(el);
-      const orig = new Map();
-      sel.forEach(x => orig.set(x, x.classList.contains('lbl') ? { l: parseFloat(x.style.left), t: parseFloat(x.style.top) } : itemData(x)));
+      const orig = origOf();
       const bbs = [...sel].filter(x => x.classList.contains('it')).map(bboxOf);
       const top = bbs.length ? Math.min(...bbs.map(b => b[1])) : null;
-      const lockX = [...sel].some(x => x.dataset.tb), rowSnap = [...sel].some(onRows);
+      // 표·개념도는 좌우로 움직이지 않고 줄 단위로만 오르내린다
+      const rowSnap = [...sel].some(onRows), lockX = rowSnap;
       const xr = bbs.length ? [Math.min(...bbs.map(b => b[0])), Math.max(...bbs.map(b => b[2]))] : null;
       act = { type: 'move', sheet, p0: p, orig, top, xr, lockX, rowSnap, moved: false, clickLabel: lbl && !e.ctrlKey && !e.metaKey && tool !== 'move' ? lbl : null };
       document.body.classList.add('dragging');
@@ -1354,6 +1356,12 @@
         if ('l' in o) { el.style.left = o.l + dx + 'px'; el.style.top = o.t + dy + 'px'; }
         else setPts(el, { x1: o.x1 + dx, y1: o.y1 + dy, x2: o.x2 + dx, y2: o.y2 + dy });
       });
+      // 끄는 도중에도 쪽을 넘으면 바로 옆 쪽으로 붙이고, 그 자리를 새 기준으로 삼는다
+      if (act.rowSnap && fitPage(true)) {
+        act.sheet = [...sel][0].closest('.sheet');
+        act.p0 = sheetPt(act.sheet, e);
+        act.orig = origOf();
+      }
       renderHandles();
     } else if (act.type === 'marquee') {
       const L = Math.min(p.x, act.p0.x), T = Math.min(p.y, act.p0.y);
