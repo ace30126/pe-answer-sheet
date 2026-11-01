@@ -1610,9 +1610,18 @@
   $('#btnEnd').onclick = () => {
     const c = needCell();
     if (!c) return;
-    const t = $('.txt', c.closest('.row'));
-    setCaret(t, len(t));
-    document.execCommand('insertText', false, (t.textContent.trim() ? '  ' : '') + '"끝"');
+    // 이하 여백처럼 글자 칸(라벨)으로, 지금 줄 글 끝 바로 뒤에 둔다. 자리가 없으면 다음 빈 줄 첫머리
+    let row = c.closest('.row'), sheet = row.closest('.sheet');
+    const t = $('.txt', row), sr = sheet.getBoundingClientRect(), sc = scaleOf(sheet);
+    const r = document.createRange();
+    r.selectNodeContents(t);
+    const end = t.textContent.trim() ? (r.getBoundingClientRect().right - sr.left) / sc - BORDER + 14 : MKW + 4;
+    let x = end;
+    if (x + 60 > SW) { row = ensureNextEmpty(row); sheet = row.closest('.sheet'); x = MKW + 4; }
+    pushUndo();
+    addLabel(sheet, { x, y: $$('.row', sheet).indexOf(row) * LH, html: '"끝"', a: 'l' });
+    blurActive();
+    changed();
   };
   $('#btnBlank').onclick = () => {
     const c = needCell();
