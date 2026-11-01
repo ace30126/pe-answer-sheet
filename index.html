@@ -255,7 +255,7 @@
   <span id="stat"></span>
   <span id="saveState"></span>
   <span class="note">비공식 실습 도구(Q-Net 공식 아님) · PC 브라우저 전용 · 답안은 이 브라우저에만 저장되니 다른 PC로 옮기거나 보관하려면 [저장]으로 파일을 받아 두세요</span>
-  <span class="help">"1. " "가. " "- " 를 치면 번호 칸으로 자동 정렬 · Shift+드래그 직선 · Ctrl+드래그 여러 개 선택 · 그림 선택 후 Delete/화살표/Ctrl+D · Ctrl+V 그림 붙여넣기</span>
+  <span class="help">"1. " "가. " "- " 를 치면 번호 칸으로 자동 정렬 · Shift+드래그 직선 · 도형 더블클릭=도형 안에 글자 · Ctrl+드래그 여러 개 선택 · 그림 선택 후 Delete/화살표/Ctrl+D · Ctrl+V 그림 붙여넣기</span>
 </div>
 <main id="stage"><div id="pages"></div></main>
 <div id="toast"></div>
@@ -749,7 +749,30 @@
       if (el.classList.contains('lbl')) { el.style.left = parseFloat(el.style.left) + dx + 'px'; el.style.top = parseFloat(el.style.top) + dy + 'px'; }
       else { const d = itemData(el); setPts(el, { x1: d.x1 + dx, y1: d.y1 + dy, x2: d.x2 + dx, y2: d.y2 + dy }); }
     });
+    fitPage();
     renderHandles(); updateAllMasks(); changed();
+  }
+  // 표·개념도가 쪽 아래(위)로 넘치면 통째로 다음 쪽 첫 줄(앞 쪽 끝 줄)로 옮긴다
+  function fitPage() {
+    const els = [...sel];
+    if (!els.some(onRows)) return;
+    const sheet = els[0].closest('.sheet'), bbs = els.filter(x => x.classList.contains('it')).map(bboxOf);
+    if (!bbs.length) return;
+    const top = Math.min(...bbs.map(b => b[1])), bot = Math.max(...bbs.map(b => b[3])), H = ROWS * LH;
+    if (bot - top > H) return;
+    const pages = $$('.page'), i = pages.indexOf(sheet.closest('.page'));
+    let to = sheet, dy = 0;
+    if (bot > H) { to = $('.sheet', pages[i + 1] || makePage()); dy = -top; }
+    else if (top < 0) {
+      if (i > 0) { to = $('.sheet', pages[i - 1]); dy = H - bot; }
+      else dy = -top;
+    }
+    if (!dy && to === sheet) return;
+    els.forEach(el => {
+      if (el.classList.contains('lbl')) { el.style.top = parseFloat(el.style.top) + dy + 'px'; if (to !== sheet) $('.labels', to).appendChild(el); }
+      else { const d = itemData(el); setPts(el, { y1: d.y1 + dy, y2: d.y2 + dy }); if (to !== sheet) $('.items', to).appendChild(el); }
+    });
+    if (to !== sheet) to.closest('.page').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // 되돌리기 (그리기·그림만)
@@ -1366,7 +1389,7 @@
     } else if (a.type === 'handle') {
       updateMask(a.sheet); changed();
     } else if (a.type === 'move') {
-      if (a.moved) { updateAllMasks(); changed(); }
+      if (a.moved) { if (a.rowSnap) { fitPage(); renderHandles(); } updateAllMasks(); changed(); }
       else if (a.clickLabel) { clearSel(); pushUndo(); editLabel(a.clickLabel); }
     } else if (a.type === 'marquee') {
       a.box.remove();
@@ -1381,6 +1404,21 @@
     }
   });
 
+  // 도형 안쪽을 더블클릭해도 그 도형을 고른다 (겹치면 가장 작은 것, 개념도 바깥 테두리는 뺀다)
+  function shapeAt(e) {
+    const sheet = e.target.closest && e.target.closest('.sheet');
+    if (!sheet) return null;
+    const p = sheetPt(sheet, e);
+    let best = null, area = Infinity;
+    $$('.it', sheet).forEach(el => {
+      const d = itemData(el);
+      if (isLineT(d.t) || el.dataset.tb) return;
+      const [L, T, R, B] = bboxOf(el), a = (R - L) * (B - T);
+      if (R - L >= FR - FL - 1) return;
+      if (p.x > L && p.x < R && p.y > T && p.y < B && a < area) { best = el; area = a; }
+    });
+    return best;
+  }
   pagesEl.addEventListener('dblclick', e => {
     const tc = e.target.closest('.tcell'), T = tc && curTable();
     if (T) {
@@ -1390,11 +1428,13 @@
       setTimeout(() => editLabel(l), 0);
       return;
     }
-    const it = e.target.closest('.it');
+    const it = e.target.closest('.it') || shapeAt(e);
     if (!it) return;
     const d = itemData(it), sheet = it.closest('.sheet');
-    if (isLineT(d.t)) return;
+    if (isLineT(d.t) || it.dataset.tb) return;
     pushUndo();
+    // 도형과 글자를 한 묶음으로 해서 같이 움직이게 한다
+    if (!it.dataset.g) it.dataset.g = newId();
     const l = addLabel(sheet, { x: (d.x1 + d.x2) / 2, y: (d.y1 + d.y2) / 2 - LH / 2, html: '', a: 'c', g: it.dataset.g });
     clearSel();
     setTimeout(() => editLabel(l), 0);
